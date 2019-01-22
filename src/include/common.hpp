@@ -1,8 +1,10 @@
 #pragma once
 #include <cstdint>
-
+#include <cstdio>
 
 #define NTH_BIT(x, n) (((x) >> (n)) & 1)
+
+#define DEBUG(...) printf(__VA_ARGS__)
 
 /* Integer type shortcuts */
 typedef uint8_t  u8;  typedef int8_t  s8;
