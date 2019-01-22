@@ -5,7 +5,7 @@ VariantDir('build/lib', 'lib', duplicate=0)
 flags = ['-O3', '-march=native', '-std=c++14']
 
 env = Environment(ENV       = environ,
-                  CXX       = 'clang++',
+                  CXX       = 'g++',
                   CPPFLAGS  = ['-Wno-unused-value'],
                   CXXFLAGS  = flags,
                   LINKFLAGS = flags,
