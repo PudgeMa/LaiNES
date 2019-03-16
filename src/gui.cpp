@@ -278,6 +278,13 @@ void run()
     const int FPS   = 60;
     const int DELAY = 1000.0f / FPS;
 
+    const int nesNum = 100;
+    u32 nesStart; u32 nesEnd;
+    int nesI = 0, nesAll = 0;
+
+    Cartridge::load("/home/maruipu/code/nes/Battle City (J).nes");
+    toggle_pause();
+
     while (true)
     {
         frameStart = SDL_GetTicks();
@@ -294,7 +301,19 @@ void run()
                         menu->update(keys);
             }
 
-        if (not pause) CPU::run_frame();
+        if (not pause) {
+            nesStart = SDL_GetTicks();
+            CPU::run_frame();
+            nesEnd = SDL_GetTicks();
+            nesAll += (nesEnd - nesStart);
+            nesI += 1;
+            if (nesI == nesNum) {
+                // printf("profile: %d\n", nesAll / nesNum);
+                nesAll = 0;
+                nesI = 0;
+            }
+        } 
+    
         render();
 
         // Wait to mantain framerate:
