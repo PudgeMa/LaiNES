@@ -69,5 +69,9 @@ bool loaded()
     return mapper != nullptr;
 }
 
+int get_memory(Mapper::mempage** page)
+{
+    return mapper->get_memory(page);
+}
 
 }

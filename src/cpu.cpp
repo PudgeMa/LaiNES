@@ -56,14 +56,6 @@ void dma_write(void *userdata, uint16_t offset, uint8_t value) {
     }
 }
 
-uint8_t cart_read(void *userdata, uint16_t offset) {
-    return Cartridge::access<0>(offset, 0);
-}
-
-void cart_write(void *userdata, uint16_t offset, uint8_t value) {
-    Cartridge::access<1>(offset, value);
-}
-
 nes6502_memread readhandlers[] = {
     {
         .min_range = 0x2000,
@@ -92,31 +84,29 @@ nes6502_memwrite writehandlers[] = {
 
 const int writehandlers_num = 2;
 
-nes6502_memread cart_r = {
-    .min_range = 0x6000,
-    .max_range = 0xFFFF,
-    .read_func = cart_read,
-    .userdata = nullptr
-};
-
-nes6502_memwrite cart_w = {
-    .min_range = 0x6000,
-    .max_range = 0xFFFF,
-    .write_func = cart_write,
-    .userdata = nullptr
-};
+u8 mem[0x800];
 
 void power()
 {
+    memset(mem, 0, sizeof(mem));
+
     nes6502_context context;
     memset(&context, 0, sizeof(nes6502_context));
+    context.mem_page[0] = mem;
+
+    Mapper::mempage* pages;
+    int num = Cartridge::get_memory(&pages);
+    for(size_t i = 0; i < num; i++)
+    {
+        context.mem_page[pages[i].pagenum] = pages[i].mem;
+    }
+
     context.jam_callback = cpu_jam;
-    context.io_r_handler = readhandlers;
-    context.io_r_num = readhandlers_num;
-    context.io_w_handler = writehandlers;
-    context.io_w_num = writehandlers_num;
-    context.cart_r_handler = &cart_r;
-    context.cart_w_handler = &cart_w;
+    context.read_handler= readhandlers;
+    context.read_num = readhandlers_num;
+    context.write_handler = writehandlers;
+    context.write_num = writehandlers_num;
+
     nes6502_setcontext(&context);
     nes6502_reset();
 }
@@ -129,7 +119,7 @@ void run_frame()
     remainingCycles += TOTAL_CYCLES;
 
     while (remainingCycles > 0) {
-        int c = nes6502_execute(1);
+        int c = nes6502_execute(100);
         for(int i = 0; i < 3 * c; ++i) {
             PPU::step();
         }

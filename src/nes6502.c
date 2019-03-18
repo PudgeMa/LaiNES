@@ -1,16 +1,26 @@
-#include "nes6502.h"
+/*
+// shatbox (C) 2002 Matthew Conte (matt@conte.com)
+**
+**
+** nes6502.c
+**
+** NES custom 6502 (2A03) CPU implementation
+**
+** $Id: $
+*/
+
 #include <stdio.h>
-#include <stdlib.h>
+#include "nes6502.h"
 #include "dis6502.h"
 
-#define  NES6502_RMW_EXACT
+//#define  NES6502_DISASM
+//#define  NES6502_RMW_EXACT
+#define  NES6502_JUMPTABLE
 
-#ifdef __GNUC__
-#  define  NES6502_JUMPTABLE
-#endif /* __GNUC__ */
-
-#ifndef MIN
-#  define  MIN(a,b)    (((a) < (b)) ? (a) : (b))
+#ifdef NES6502_DISASM
+#define DISASM_INSTRUCTION(_PC, _P, _A, _X, _Y, _S)   printf(nes6502_disasm(_PC, _P, _A, _X, _Y, _S))
+#else
+#define DISASM_INSTRUCTION(_PC, _P, _A, _X, _Y, _S)
 #endif
 
 #ifdef NES6502_RMW_EXACT
@@ -18,6 +28,12 @@
 #else /* !NES6502_RMW_EXACT */
 #define  RMW_STEP(func, address, val)
 #endif /* !NES6502_RMW_EXACT */
+
+#ifndef MIN
+#define  MIN(a,b)    (((a) < (b)) ? (a) : (b))
+#endif
+
+#define  INLINE  static inline
 
 /* P (flag) register bitmasks */
 #define  N_FLAG         0x80
@@ -44,6 +60,7 @@
 /* Stack is located on 6502 page 1 */
 #define  STACK_OFFSET   0x0100
 
+
 #define  GET_GLOBAL_REGS() \
 { \
    PC = cpu.pc_reg; \
@@ -63,6 +80,7 @@
    cpu.p_reg = COMBINE_FLAGS(); \
    cpu.s_reg = S; \
 }
+
 
 #define  ADD_CYCLES(x) \
 { \
@@ -139,7 +157,7 @@
 #define ABS_IND_Y_ADDR(address) \
 { \
    ABSOLUTE_ADDR(address); \
-   address = address + Y; \
+   address = (address + Y) & 0xffff; \
 }
 
 #define ABS_IND_Y(address, value) \
@@ -233,7 +251,7 @@
 #define INDIR_Y_ADDR(address) \
 { \
    ZERO_PAGE_ADDR(btemp); \
-   address = zp_readword(btemp) + Y; \
+   address = (zp_readword(btemp) + Y) & 0xffff; \
 }
 
 #define INDIR_Y(address, value) \
@@ -255,9 +273,12 @@
    value = mem_readbyte(temp); \
 }
 
+
+
 /* Stack push/pull */
-#define  PUSH(value)             cpu.mem[STACK_OFFSET + S--] = (uint8_t) (value)
-#define  PULL()                  cpu.mem[STACK_OFFSET + ++S]
+#define  PUSH(value)             cpu.mem_page[0][STACK_OFFSET + S--] = (uint8_t) (value)
+#define  PULL()                  cpu.mem_page[0][STACK_OFFSET + ++S]
+
 
 /*
 ** flag register helper macros
@@ -317,7 +338,7 @@
 
 #define JUMP(address) \
 { \
-   PC = mem_readword((address)); \
+   PC = bank_readword((address)); \
 }
 
 /*
@@ -384,7 +405,6 @@
    ADD_CYCLES(cycles); \
 }
 
-/* undocumented */
 #define ARR(cycles, read_func) \
 { \
    read_func(data); \
@@ -651,7 +671,7 @@
    temp = bank_readword(PC); \
    /* bug in crossing page boundaries */ \
    if (0xff == (temp & 0xff)) \
-      PC = (mem_readbyte(temp & 0xff00) << 8) | mem_readbyte(temp); \
+      PC = (bank_readbyte(temp & 0xff00) << 8) | bank_readbyte(temp); \
    else \
       JUMP(temp); \
    ADD_CYCLES(5); \
@@ -1058,70 +1078,65 @@ static nes6502_context cpu;
 ** Zero-page helper macros
 */
 
-#define  ZP_READBYTE(addr)          cpu.mem[(addr)]
-#define  ZP_WRITEBYTE(addr, value)  cpu.mem[(addr)] = (uint8_t) (value)
+#define  ZP_READBYTE(addr)          cpu.mem_page[0][(addr)]
+#define  ZP_WRITEBYTE(addr, value)  cpu.mem_page[0][(addr)] = (uint8_t) (value)
 
-static void DISASM_INSTRUCTION() {
-   printf("%s\n", nes6502_disasm(cpu.pc_reg, cpu.p_reg, cpu.a_reg, cpu.x_reg, cpu.y_reg, cpu.s_reg));
-}
-
-static uint8_t bank_readbyte(uint16_t address)
+/* NOTE: bank_readbyte、bank_writebyte、bank_readword
+** these functions should only read/write memory when it's address > 0x6000
+*/
+INLINE uint8_t bank_readbyte(uint_fast16_t address)
 {
-   nes6502_memread* r = cpu.cart_r_handler;
-   if (r->min_range <= address && address <= r->max_range) 
-   {
-      return r->read_func(r->userdata, address);
-   }
-   printf("error: bank_readbyte at 0x%x\n", address);
-   return 0xFF;
+   return cpu.mem_page[address / NES6502_BANKSIZE][address % NES6502_BANKSIZE];
 }
 
-static void bank_writebyte(uint16_t address, uint8_t value)
+INLINE void bank_writebyte(uint_fast16_t address, uint8_t value)
 {
-   nes6502_memwrite* w = cpu.cart_w_handler;
-   if (w->min_range <= address && address <= w->max_range) 
-   {
-      w->write_func(w->userdata, address, value);
-      return;
-   }
-   printf("error: bank_writebyte at 0x%x\n", address);
+   cpu.mem_page[address / NES6502_BANKSIZE][address % NES6502_BANKSIZE] = value;
 }
+
+#ifndef HOST_BIG_ENDIAN
 
 /* NOTE: following two functions will fail on architectures
 ** which do not support unaligned accesses
 */
-static inline uint16_t zp_readword(uint8_t address)
+INLINE uint_fast16_t zp_readword(uint8_t address)
 {
-   return (*(uint16_t *)(cpu.mem + address));
+   return (uint_fast16_t) (*(uint16_t *)(cpu.mem_page[0] + address));
 }
 
-static uint16_t bank_readword(uint16_t address)
+INLINE uint_fast16_t bank_readword(uint_fast16_t address)
 {
-   uint8_t low = bank_readbyte(address);
-   uint8_t hight = bank_readbyte(address + 1);
-   return hight << 8 | low;
+   /* technically, this should fail if the address is $xFFF, but
+   ** any code that does this would be suspect anyway, as it would
+   ** be fetching a word across page boundaries, which only would
+   ** make sense if the banks were physically consecutive.
+   */
+   return (uint_fast16_t) (*(uint16_t *)(cpu.mem_page[address / NES6502_BANKSIZE] + (address % NES6502_BANKSIZE)));
 }
 
-static uint16_t mem_readword(uint16_t address) 
+#else /* HOST_BIG_ENDIAN */
+
+INLINE uint_fast16_t zp_readword(uint8_t address)
 {
-   if (address < 0x2000)
-   {
-      return zp_readword(address & 0x7ff);
-   } 
-   else if (address >= 0x6000)
-   {
-      return bank_readword(address);
-   }
-   printf("error: should not read word at 0x%x\n", address);
+    uint_fast16_t x = (uint_fast16_t) *(uint16_t *)(cpu.mem_page[0] + address);
+   return (x << 8) | (x >> 8);
 }
+
+INLINE uint_fast16_t bank_readword(uint_fast16_t address)
+{
+    uint_fast16_t x = (uint_fast16_t) *(uint16_t *)(cpu.mem_page[address / NES6502_BANKSIZE] + (address % NES6502_BANKSIZE));
+   return (x << 8) | (x >> 8);
+}
+
+#endif /* HOST_BIG_ENDIAN */
 
 /* read a byte of 6502 memory */
-static uint8_t mem_readbyte(uint16_t address)
+static uint8_t mem_readbyte(uint_fast16_t address)
 {
    if (address < 0x2000)
    {
       /* RAM */
-      return cpu.mem[address & 0x7ff];
+      return cpu.mem_page[0][address & 0x7ff];
    }
    else if (address >= 0x6000)
    {
@@ -1133,44 +1148,45 @@ static uint8_t mem_readbyte(uint16_t address)
    {
       nes6502_memread *mr;
 
-      for (int i = 0; i < cpu.io_r_num; ++i)
+      for (int i = 0; i < cpu.read_num; ++i)
       {
-         mr = &cpu.io_r_handler[i];
+         mr = &cpu.read_handler[i];
          if (address >= mr->min_range && address <= mr->max_range)
-            return mr->read_func(mr->userdata, address);
+            return mr->read_func(mr->userdata, address - mr->min_range);
       }
-      // printf("info: read byte at 0x%x\n", address);
+      // TODO: warning this situation!
       return 0x00;
    }
 }
 
 /* write a byte of data to 6502 memory */
-static void mem_writebyte(uint32_t address, uint8_t value)
+static void mem_writebyte(uint_fast16_t address, uint8_t value)
 {
    /* RAM */
    if (address < 0x2000)
    {
-      cpu.mem[address & 0x7ff] = value;
-   } else if (address >= 0x6000)
-   {
-      /* always paged memory */
-      bank_writebyte(address, value);
+      cpu.mem_page[0][address & 0x7ff] = value;
+      return;
    }
    /* check memory range handlers */
    else
    {
       nes6502_memwrite *mw;
 
-      for (int i = 0; i < cpu.io_w_num; ++i)
+      for (int i = 0; i < cpu.write_num; ++i)
       {
-         mw = &cpu.io_w_handler[i];
+         mw = &cpu.write_handler[i];
          if (address >= mw->min_range && address <= mw->max_range)
          {
-            return mw->write_func(mw->userdata, address, value);
+            return mw->write_func(mw->userdata, address - mw->min_range, value);
          }
       }
-      // printf("info: write byte at 0x%x\n", address);
    }
+   if (address >= 0x6000) {
+       bank_writebyte(address, value);
+   }
+   // TODO: warning this situation!
+   // where to write?
 }
 
 /* set the current context */
@@ -1185,24 +1201,18 @@ void nes6502_setcontext(nes6502_context *context)
 /* get the current context */
 void nes6502_getcontext(nes6502_context *context)
 {
-   int loop;
-
    if (NULL == context)
       return;
 
    *context = cpu;
 }
 
-/* DMA a byte of data from ROM */
-uint8_t nes6502_getbyte(uint16_t address)
-{
-   return mem_readbyte(address);
-}
+uint8_t nes6502_getbyte(uint16_t address) __attribute__ ((weak, alias ("mem_readbyte"))); // @suppress("Unused function declaration")
 
 /* get number of elapsed cycles */
-uint32_t nes6502_getcycles(bool reset_flag)
+long nes6502_getcycles(bool reset_flag)
 {
-   uint32_t cycles = cpu.total_cycles;
+   long cycles = cpu.total_cycles;
 
    if (reset_flag)
       cpu.total_cycles = 0;
@@ -1214,11 +1224,9 @@ uint32_t nes6502_getcycles(bool reset_flag)
 #ifdef NES6502_JUMPTABLE
 
 #define  OPCODE_BEGIN(xx)  op##xx:
-
-/* todo: remove STORE_LOCAL_REGS();*/
-#define  OPCODE_END        STORE_LOCAL_REGS(); \
-                           if (cpu.remaining_cycles <= 0) \
+#define  OPCODE_END        if (cpu.remaining_cycles <= 0) \
                               goto end_execute; \
+                           DISASM_INSTRUCTION(PC, COMBINE_FLAGS(), A, X, Y, S); \
                            goto *opcode_table[bank_readbyte(PC++)];
 
 #else /* !NES6502_JUMPTABLE */
@@ -1234,11 +1242,11 @@ uint32_t nes6502_getcycles(bool reset_flag)
 ** Returns the number of cycles *actually* executed, which will be
 ** anywhere from zero to timeslice_cycles + 6
 */
-int nes6502_execute(int timeslice_cycles)
+long nes6502_execute(long timeslice_cycles)
 {
-   int old_cycles = cpu.total_cycles;
+   long old_cycles = cpu.total_cycles;
 
-   uint16_t temp, addr; /* for macros */
+   uint_fast16_t temp, addr; /* for macros */
    uint8_t btemp, baddr; /* for macros */
    uint8_t data;
 
@@ -1247,7 +1255,7 @@ int nes6502_execute(int timeslice_cycles)
    uint8_t d_flag, i_flag, z_flag, c_flag;
 
    /* local copies of regs */
-   uint16_t PC;
+   uint_fast16_t PC;
    uint8_t A, X, Y, S;
 
 #ifdef NES6502_JUMPTABLE
@@ -1318,6 +1326,10 @@ int nes6502_execute(int timeslice_cycles)
    /* Continue until we run out of cycles */
    while (cpu.remaining_cycles > 0)
    {
+#ifdef NES6502_DISASM
+      printf(nes6502_disasm(PC, COMBINE_FLAGS(), A, X, Y, S));
+#endif /* NES6502_DISASM */
+
       /* Fetch and execute instruction */
       switch (bank_readbyte(PC++))
       {
@@ -2279,7 +2291,7 @@ void nes6502_reset(void)
 
 /* following macro is used for below 2 functions */
 #define  DECLARE_LOCAL_REGS \
-   uint32_t PC; \
+   uint_fast16_t PC; \
    uint8_t A, X, Y, S; \
    uint8_t n_flag, v_flag; \
    uint8_t d_flag, i_flag, z_flag, c_flag;
@@ -2325,7 +2337,7 @@ void nes6502_clearirq(void)
 }
 
 /* Set burn cycle period */
-void nes6502_burn(int cycles)
+void nes6502_burn(long cycles)
 {
    cpu.burn_cycles += cycles;
 }

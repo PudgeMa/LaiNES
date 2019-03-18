@@ -70,3 +70,19 @@ template void Mapper::map_chr<8>(int, int);
 template void Mapper::map_chr<4>(int, int);
 template void Mapper::map_chr<2>(int, int);
 template void Mapper::map_chr<1>(int, int);
+
+Mapper::mempage pages[5];
+
+int Mapper::get_memory(Mapper::mempage** page)
+{
+    pages[0].pagenum = 3;
+    pages[0].mem = prgRam;
+    int pageStart = 4;
+    for(size_t i = 0; i < 4; i++)
+    {   
+        pages[i + 1].pagenum = pageStart + i;
+        pages[i + 1].mem = prg + prgMap[i];
+    }
+    *page = pages;
+    return 5;    
+}
