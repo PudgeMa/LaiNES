@@ -8,6 +8,9 @@
 #include "cpu.hpp"
 #include "nes6502.h"
 #include "dis6502.h"
+#include <sys/time.h>
+#include <unistd.h>
+#include "gui.hpp"
 
 namespace CPU {
 
@@ -84,7 +87,10 @@ nes6502_memwrite writehandlers[] = {
 
 const int writehandlers_num = 2;
 
+#define NES_SCANLINE_CYCLES 113
+
 u8 mem[0x800];
+long current_cycles = 0;
 
 void power()
 {
@@ -109,22 +115,31 @@ void power()
 
     nes6502_setcontext(&context);
     nes6502_reset();
+    current_cycles = NES_SCANLINE_CYCLES;
 }
 
-const int TOTAL_CYCLES = 29781;
-int remainingCycles;
+u32 pixels[256 * 240];     // Video buffer.
 
 void run_frame()
 {
-    remainingCycles += TOTAL_CYCLES;
 
-    while (remainingCycles > 0) {
-        int c = nes6502_execute(100);
-        for(int i = 0; i < 3 * c; ++i) {
-            PPU::step();
+   for(int i = 0; i <= 261; ++i)
+   {
+        int scanline = PPU::get_scanline();
+        u32 *buffer = PPU::do_scanline();
+        if (i < 240) 
+        {
+           for(int j = 0; j < 256; j++)
+           {
+               pixels[i * 256 + j] = buffer[j];
+           }
+                
         }
-        remainingCycles -= c;
-    }
+        GUI::new_frame(pixels);
+        if (current_cycles > 0)
+            current_cycles -= nes6502_execute(current_cycles);
+        current_cycles += NES_SCANLINE_CYCLES;  
+   }
 }
 
 }

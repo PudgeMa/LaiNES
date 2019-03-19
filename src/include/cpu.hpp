@@ -4,7 +4,6 @@
 
 namespace CPU {
 
-
 enum IntType { NMI, RESET, IRQ, BRK };  // Interrupt type.
 
 void set_nmi(bool v = true);

@@ -3,8 +3,6 @@
 
 namespace PPU {
 
-
-enum Scanline  { VISIBLE, POST, NMI, PRE };
 enum Mirroring { VERTICAL, HORIZONTAL };
 
 /* Sprite buffer */
@@ -86,8 +84,9 @@ union Addr
 
 template <bool write> u8 access(u16 index, u8 v = 0);
 void set_mirroring(Mirroring mode);
-void step();
+u32*  do_scanline();
+int   get_scanline();
+bool  vbl();
 void reset();
-
 
 }

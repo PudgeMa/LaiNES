@@ -25,9 +25,9 @@
 
 #ifdef NES6502_RMW_EXACT
 #define  RMW_STEP(func, address, val)  func((address), (val))
-#else /* !NES6502_RMW_EXACT */
+#else
 #define  RMW_STEP(func, address, val)
-#endif /* !NES6502_RMW_EXACT */
+#endif
 
 #ifndef MIN
 #define  MIN(a,b)    (((a) < (b)) ? (a) : (b))
@@ -60,7 +60,6 @@
 /* Stack is located on 6502 page 1 */
 #define  STACK_OFFSET   0x0100
 
-
 #define  GET_GLOBAL_REGS() \
 { \
    PC = cpu.pc_reg; \
@@ -80,7 +79,6 @@
    cpu.p_reg = COMBINE_FLAGS(); \
    cpu.s_reg = S; \
 }
-
 
 #define  ADD_CYCLES(x) \
 { \

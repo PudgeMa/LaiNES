@@ -25,16 +25,16 @@ extern "C" {
 
 typedef struct nes6502_memread_s
 {
-   uint16_t       min_range, max_range;
-   uint8_t        (*read_func)(void *userdata, uint16_t address);
-   void           *userdata;
+   int         min_range, max_range;
+   uint8_t     (*read_func)(void *userdata, uint16_t address);
+   void        *userdata;
 } nes6502_memread;
 
 typedef struct nes6502_memwrite_s
 {
-   uint16_t       min_range, max_range;
-   void           (*write_func)(void *userdata, uint16_t address, uint8_t value);
-   void           *userdata;
+   int         min_range, max_range;
+   void        (*write_func)(void *userdata, uint16_t address, uint8_t value);
+   void        *userdata;
 } nes6502_memwrite;
 
 typedef struct nes6502_context_s
