@@ -282,9 +282,6 @@ void run()
     u32 nesStart; u32 nesEnd;
     int nesI = 0, nesAll = 0;
 
-    Cartridge::load("/home/maruipu/code/nes/Battle City (J).nes");
-    toggle_pause();
-
     while (true)
     {
         frameStart = SDL_GetTicks();

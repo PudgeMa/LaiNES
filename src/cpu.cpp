@@ -120,26 +120,26 @@ void power()
 
 u32 pixels[256 * 240];     // Video buffer.
 
+static inline void execute()
+{
+	if (current_cycles > 0)
+			current_cycles -= nes6502_execute(current_cycles);
+	current_cycles += NES_SCANLINE_CYCLES;
+}
+
 void run_frame()
 {
-
-   for(int i = 0; i <= 261; ++i)
-   {
-        int scanline = PPU::get_scanline();
-        u32 *buffer = PPU::do_scanline();
-        if (i < 240) 
-        {
-           for(int j = 0; j < 256; j++)
-           {
-               pixels[i * 256 + j] = buffer[j];
-           }
-                
-        }
-        GUI::new_frame(pixels);
-        if (current_cycles > 0)
-            current_cycles -= nes6502_execute(current_cycles);
-        current_cycles += NES_SCANLINE_CYCLES;  
-   }
+    for (int i = 0; i < 240; ++i)
+    {
+		PPU::scanline_visible(i, pixels + i * 256);
+	    execute();
+    }
+    GUI::new_frame(pixels);
+    for(int i = 240; i <= 261; ++i)
+    {
+		PPU::scanline_other(i);
+		execute();
+    }
 }
 
 }
