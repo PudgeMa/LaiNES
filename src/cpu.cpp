@@ -3,13 +3,11 @@
 #include <iostream>
 #include "apu.hpp"
 #include "cartridge.hpp"
-#include "joypad.hpp"
 #include "ppu.hpp"
 #include "cpu.hpp"
 #include "nes6502.h"
 #include "dis6502.h"
-#include <sys/time.h>
-#include <unistd.h>
+#include "joypad.h"
 #include "gui.hpp"
 
 namespace CPU {
@@ -65,10 +63,15 @@ nes6502_memread readhandlers[] = {
         .max_range = 0x3FFF,
         .read_func = ppu_read,
         .userdata = nullptr
+    }, {
+        .min_range = 0x4016,
+        .max_range = 0x4017,
+        .read_func = joypad_handler_read,
+        .userdata = nullptr
     }
 };
 
-const int readhandlers_num = 1;
+const int readhandlers_num = 2;
 
 nes6502_memwrite writehandlers[] = {
     {
@@ -76,16 +79,20 @@ nes6502_memwrite writehandlers[] = {
         .max_range = 0x3FFF,
         .write_func = ppu_write,
         .userdata = nullptr
-    },
-    {
+    }, {
         .min_range = 0x4014, 
         .max_range = 0x4014,
         .write_func = dma_write,
         .userdata = nullptr
+    }, {
+        .min_range = 0x4016,
+        .max_range = 0x4016,
+        .write_func = joypad_handler_write,
+        .userdata = nullptr
     }
 };
 
-const int writehandlers_num = 2;
+const int writehandlers_num = 3;
 
 #define NES_SCANLINE_CYCLES 113
 

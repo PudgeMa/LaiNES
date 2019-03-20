@@ -8,6 +8,7 @@
 #include "menu.hpp"
 #include "gui.hpp"
 #include "config.hpp"
+#include "joypad.h"
 
 namespace GUI {
 
@@ -295,20 +296,11 @@ void run()
                     if (keys[SDL_SCANCODE_ESCAPE] and Cartridge::loaded())
                         toggle_pause();
                     else if (pause)
-                        menu->update(keys);
+                        menu->update(keys);       
             }
 
         if (not pause) {
-            nesStart = SDL_GetTicks();
             CPU::run_frame();
-            nesEnd = SDL_GetTicks();
-            nesAll += (nesEnd - nesStart);
-            nesI += 1;
-            if (nesI == nesNum) {
-                // printf("profile: %d\n", nesAll / nesNum);
-                nesAll = 0;
-                nesI = 0;
-            }
         } 
     
         render();
