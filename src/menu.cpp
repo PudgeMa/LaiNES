@@ -1,6 +1,6 @@
 #include <dirent.h>
 #include <unistd.h>
-#include "cartridge.hpp"
+#include "cartridge_new.h"
 #include "menu.hpp"
 
 namespace GUI {
@@ -121,7 +121,7 @@ void FileMenu::change_dir(string dir)
         else if (name.size() > 4 and name.substr(name.size() - 4) == ".nes")
         {
             add(new Entry(name,
-                          [=]{ Cartridge::load(path.c_str()); toggle_pause(); }));
+                          [=]{ /*load(path.c_str()); toggle_pause();*/ }));
         }
     }
     closedir(dp);

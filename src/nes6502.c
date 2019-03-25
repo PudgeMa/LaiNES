@@ -25,9 +25,9 @@
 
 #ifdef NES6502_RMW_EXACT
 #define  RMW_STEP(func, address, val)  func((address), (val))
-#else
+#else /* !NES6502_RMW_EXACT */
 #define  RMW_STEP(func, address, val)
-#endif
+#endif /* !NES6502_RMW_EXACT */
 
 #ifndef MIN
 #define  MIN(a,b)    (((a) < (b)) ? (a) : (b))
@@ -60,30 +60,32 @@
 /* Stack is located on 6502 page 1 */
 #define  STACK_OFFSET   0x0100
 
+
 #define  GET_GLOBAL_REGS() \
 { \
-   PC = cpu.pc_reg; \
-   A = cpu.a_reg; \
-   X = cpu.x_reg; \
-   Y = cpu.y_reg; \
-   SCATTER_FLAGS(cpu.p_reg); \
-   S = cpu.s_reg; \
+   PC = cpu->pc_reg; \
+   A = cpu->a_reg; \
+   X = cpu->x_reg; \
+   Y = cpu->y_reg; \
+   SCATTER_FLAGS(cpu->p_reg); \
+   S = cpu->s_reg; \
 }
 
 #define  STORE_LOCAL_REGS() \
 { \
-   cpu.pc_reg = PC; \
-   cpu.a_reg = A; \
-   cpu.x_reg = X; \
-   cpu.y_reg = Y; \
-   cpu.p_reg = COMBINE_FLAGS(); \
-   cpu.s_reg = S; \
+   cpu->pc_reg = PC; \
+   cpu->a_reg = A; \
+   cpu->x_reg = X; \
+   cpu->y_reg = Y; \
+   cpu->p_reg = COMBINE_FLAGS(); \
+   cpu->s_reg = S; \
 }
+
 
 #define  ADD_CYCLES(x) \
 { \
-   cpu.total_cycles += (x); \
-   cpu.remaining_cycles -= (x); \
+   cpu->total_cycles += (x); \
+   cpu->remaining_cycles -= (x); \
 }
 
 /*
@@ -274,8 +276,8 @@
 
 
 /* Stack push/pull */
-#define  PUSH(value)             cpu.mem_page[0][STACK_OFFSET + S--] = (uint8_t) (value)
-#define  PULL()                  cpu.mem_page[0][STACK_OFFSET + ++S]
+#define  PUSH(value)             cpu->mem_page[0][STACK_OFFSET + S--] = (uint8_t) (value)
+#define  PULL()                  cpu->mem_page[0][STACK_OFFSET + ++S]
 
 
 /*
@@ -522,9 +524,9 @@
 { \
    ADD_CYCLES(2); \
    i_flag = 0; \
-   if (cpu.int_pending && cpu.remaining_cycles > 0) \
+   if (cpu->int_pending && cpu->remaining_cycles > 0) \
    { \
-      cpu.int_pending = false; \
+      cpu->int_pending = false; \
       IRQ_PROC(); \
       ADD_CYCLES(INT_CYCLES); \
    } \
@@ -650,16 +652,16 @@
 
 #define JAM() \
 { \
-   if (cpu.jam_callback) \
+   if (cpu->jam_callback) \
    { \
       STORE_LOCAL_REGS(); \
-      cpu.jam_callback(&cpu); \
+      cpu->jam_callback(cpu); \
    } \
    else \
    { \
       PC--; \
-      cpu.jammed = true; \
-      cpu.int_pending = false; \
+      cpu->jammed = true; \
+      cpu->int_pending = false; \
       ADD_CYCLES(2); \
    } \
 }
@@ -873,9 +875,9 @@
    PC = PULL(); \
    PC |= PULL() << 8; \
    ADD_CYCLES(6); \
-   if (0 == i_flag && cpu.int_pending && cpu.remaining_cycles > 0) \
+   if (0 == i_flag && cpu->int_pending && cpu->remaining_cycles > 0) \
    { \
-      cpu.int_pending = false; \
+      cpu->int_pending = false; \
       IRQ_PROC(); \
       ADD_CYCLES(INT_CYCLES); \
    } \
@@ -1070,26 +1072,26 @@
 }
 
 /* internal CPU context */
-static nes6502_context cpu;
+static nes6502_context *cpu;
 
 /*
 ** Zero-page helper macros
 */
 
-#define  ZP_READBYTE(addr)          cpu.mem_page[0][(addr)]
-#define  ZP_WRITEBYTE(addr, value)  cpu.mem_page[0][(addr)] = (uint8_t) (value)
+#define  ZP_READBYTE(addr)          cpu->mem_page[0][(addr)]
+#define  ZP_WRITEBYTE(addr, value)  cpu->mem_page[0][(addr)] = (uint8_t) (value)
 
-/* NOTE: bank_readbyte、bank_writebyte、bank_readword
+/* NOTE: bank_readbyte, bank_writebyte, bank_readword
 ** these functions should only read/write memory when it's address > 0x6000
 */
 INLINE uint8_t bank_readbyte(uint_fast16_t address)
 {
-   return cpu.mem_page[address / NES6502_BANKSIZE][address % NES6502_BANKSIZE];
+   return cpu->mem_page[address / NES6502_BANKSIZE][address % NES6502_BANKSIZE];
 }
 
 INLINE void bank_writebyte(uint_fast16_t address, uint8_t value)
 {
-   cpu.mem_page[address / NES6502_BANKSIZE][address % NES6502_BANKSIZE] = value;
+   cpu->mem_page[address / NES6502_BANKSIZE][address % NES6502_BANKSIZE] = value;
 }
 
 #ifndef HOST_BIG_ENDIAN
@@ -1099,7 +1101,7 @@ INLINE void bank_writebyte(uint_fast16_t address, uint8_t value)
 */
 INLINE uint_fast16_t zp_readword(uint8_t address)
 {
-   return (uint_fast16_t) (*(uint16_t *)(cpu.mem_page[0] + address));
+   return (uint_fast16_t) (*(uint16_t *)(cpu->mem_page[0] + address));
 }
 
 INLINE uint_fast16_t bank_readword(uint_fast16_t address)
@@ -1109,20 +1111,20 @@ INLINE uint_fast16_t bank_readword(uint_fast16_t address)
    ** be fetching a word across page boundaries, which only would
    ** make sense if the banks were physically consecutive.
    */
-   return (uint_fast16_t) (*(uint16_t *)(cpu.mem_page[address / NES6502_BANKSIZE] + (address % NES6502_BANKSIZE)));
+   return (uint_fast16_t) (*(uint16_t *)(cpu->mem_page[address / NES6502_BANKSIZE] + (address % NES6502_BANKSIZE)));
 }
 
 #else /* HOST_BIG_ENDIAN */
 
 INLINE uint_fast16_t zp_readword(uint8_t address)
 {
-    uint_fast16_t x = (uint_fast16_t) *(uint16_t *)(cpu.mem_page[0] + address);
+    uint_fast16_t x = (uint_fast16_t) *(uint16_t *)(cpu->mem_page[0] + address);
    return (x << 8) | (x >> 8);
 }
 
 INLINE uint_fast16_t bank_readword(uint_fast16_t address)
 {
-    uint_fast16_t x = (uint_fast16_t) *(uint16_t *)(cpu.mem_page[address / NES6502_BANKSIZE] + (address % NES6502_BANKSIZE));
+    uint_fast16_t x = (uint_fast16_t) *(uint16_t *)(cpu->mem_page[address / NES6502_BANKSIZE] + (address % NES6502_BANKSIZE));
    return (x << 8) | (x >> 8);
 }
 
@@ -1134,7 +1136,7 @@ static uint8_t mem_readbyte(uint_fast16_t address)
    if (address < 0x2000)
    {
       /* RAM */
-      return cpu.mem_page[0][address & 0x7ff];
+      return cpu->mem_page[0][address & 0x7ff];
    }
    else if (address >= 0x6000)
    {
@@ -1146,9 +1148,9 @@ static uint8_t mem_readbyte(uint_fast16_t address)
    {
       nes6502_memread *mr;
 
-      for (int i = 0; i < cpu.read_num; ++i)
+      for (int i = 0; i < cpu->read_num; ++i)
       {
-         mr = &cpu.read_handler[i];
+         mr = &cpu->read_handler[i];
          if (address >= mr->min_range && address <= mr->max_range)
             return mr->read_func(mr->userdata, address - mr->min_range);
       }
@@ -1163,7 +1165,7 @@ static void mem_writebyte(uint_fast16_t address, uint8_t value)
    /* RAM */
    if (address < 0x2000)
    {
-      cpu.mem_page[0][address & 0x7ff] = value;
+      cpu->mem_page[0][address & 0x7ff] = value;
       return;
    }
    /* check memory range handlers */
@@ -1171,9 +1173,9 @@ static void mem_writebyte(uint_fast16_t address, uint8_t value)
    {
       nes6502_memwrite *mw;
 
-      for (int i = 0; i < cpu.write_num; ++i)
+      for (int i = 0; i < cpu->write_num; ++i)
       {
-         mw = &cpu.write_handler[i];
+         mw = &cpu->write_handler[i];
          if (address >= mw->min_range && address <= mw->max_range)
          {
             return mw->write_func(mw->userdata, address - mw->min_range, value);
@@ -1190,30 +1192,21 @@ static void mem_writebyte(uint_fast16_t address, uint8_t value)
 /* set the current context */
 void nes6502_setcontext(nes6502_context *context)
 {
-   if (NULL == context)
-      return;
-
-   cpu = *context;
+   cpu = context;
 }
 
-/* get the current context */
-void nes6502_getcontext(nes6502_context *context)
+uint8_t nes6502_getbyte(uint16_t address)
 {
-   if (NULL == context)
-      return;
-
-   *context = cpu;
+	return mem_readbyte(address);
 }
-
-uint8_t nes6502_getbyte(uint16_t address) __attribute__ ((weak, alias ("mem_readbyte"))); // @suppress("Unused function declaration")
 
 /* get number of elapsed cycles */
 long nes6502_getcycles(bool reset_flag)
 {
-   long cycles = cpu.total_cycles;
+   long cycles = cpu->total_cycles;
 
    if (reset_flag)
-      cpu.total_cycles = 0;
+      cpu->total_cycles = 0;
 
    return cycles;
 }
@@ -1222,7 +1215,7 @@ long nes6502_getcycles(bool reset_flag)
 #ifdef NES6502_JUMPTABLE
 
 #define  OPCODE_BEGIN(xx)  op##xx:
-#define  OPCODE_END        if (cpu.remaining_cycles <= 0) \
+#define  OPCODE_END        if (cpu->remaining_cycles <= 0) \
                               goto end_execute; \
                            DISASM_INSTRUCTION(PC, COMBINE_FLAGS(), A, X, Y, S); \
                            goto *opcode_table[bank_readbyte(PC++)];
@@ -1242,7 +1235,7 @@ long nes6502_getcycles(bool reset_flag)
 */
 long nes6502_execute(long timeslice_cycles)
 {
-   long old_cycles = cpu.total_cycles;
+   long old_cycles = cpu->total_cycles;
 
    uint_fast16_t temp, addr; /* for macros */
    uint8_t btemp, baddr; /* for macros */
@@ -1296,25 +1289,35 @@ long nes6502_execute(long timeslice_cycles)
 
 #endif /* NES6502_JUMPTABLE */
 
-   cpu.remaining_cycles = timeslice_cycles;
+   cpu->remaining_cycles = timeslice_cycles;
 
    GET_GLOBAL_REGS();
 
    /* check for DMA cycle burning */
-   if (cpu.burn_cycles && cpu.remaining_cycles > 0)
+   // if (cpu->burn_cycles && cpu->remaining_cycles > 0)
+   // {
+   //    int burn_for = MIN(cpu->remaining_cycles, cpu->burn_cycles);
+   // 	 ADD_CYCLES(burn_for);
+   //    cpu->burn_cycles -= burn_for;
+   // }
+   if (cpu->burn_cycles)
    {
-      int burn_for = MIN(cpu.remaining_cycles, cpu.burn_cycles);
-      ADD_CYCLES(burn_for);
-      cpu.burn_cycles -= burn_for;
+	  cpu->total_cycles += cpu->burn_cycles;
+      cpu->burn_cycles = 0;
    }
 
-   if (0 == i_flag && cpu.int_pending && cpu.remaining_cycles > 0)
+   // if (0 == i_flag && cpu->int_pending && cpu->remaining_cycles > 0)
+   // {
+   //    cpu->int_pending = false;
+   //    IRQ_PROC();
+   //    ADD_CYCLES(INT_CYCLES);
+   // }
+   if (0 == i_flag && cpu->int_pending)
    {
-      cpu.int_pending = false;
-      IRQ_PROC();
-      ADD_CYCLES(INT_CYCLES);
+	   cpu->int_pending = false;
+	   IRQ_PROC();
+	   cpu->total_cycles += INT_CYCLES;
    }
-
 #ifdef NES6502_JUMPTABLE
    /* fetch first instruction */
    OPCODE_END
@@ -1322,7 +1325,7 @@ long nes6502_execute(long timeslice_cycles)
 #else /* !NES6502_JUMPTABLE */
 
    /* Continue until we run out of cycles */
-   while (cpu.remaining_cycles > 0)
+   while (cpu->remaining_cycles > 0)
    {
 #ifdef NES6502_DISASM
       printf(nes6502_disasm(PC, COMBINE_FLAGS(), A, X, Y, S));
@@ -1355,7 +1358,7 @@ long nes6502_execute(long timeslice_cycles)
       OPCODE_BEGIN(f2)  /* JAM */
          JAM();
          /* kill the CPU */
-         cpu.remaining_cycles = 0;
+         cpu->remaining_cycles = 0;
       OPCODE_END
 
       OPCODE_BEGIN(03)  /* SLO ($nn,X) */
@@ -2272,19 +2275,19 @@ end_execute:
    STORE_LOCAL_REGS();
 
    /* Return our actual amount of executed cycles */
-   return (cpu.total_cycles - old_cycles);
+   return (cpu->total_cycles - old_cycles);
 }
 
 /* Issue a CPU Reset */
 void nes6502_reset(void)
 {
-   cpu.p_reg = Z_FLAG | R_FLAG | I_FLAG;     /* Reserved bit always 1 */
-   cpu.int_pending = false;                  /* No pending interrupts */
-   cpu.pc_reg = bank_readword(RESET_VECTOR); /* Fetch reset vector */
-   cpu.burn_cycles = RESET_CYCLES;
-   cpu.total_cycles = 0;
-   cpu.remaining_cycles = 0;
-   cpu.jammed = false;
+   cpu->p_reg = Z_FLAG | R_FLAG | I_FLAG;     /* Reserved bit always 1 */
+   cpu->int_pending = false;                  /* No pending interrupts */
+   cpu->pc_reg = bank_readword(RESET_VECTOR); /* Fetch reset vector */
+   cpu->burn_cycles = RESET_CYCLES;
+   cpu->total_cycles = 0;
+   cpu->remaining_cycles = 0;
+   cpu->jammed = false;
 }
 
 /* following macro is used for below 2 functions */
@@ -2297,12 +2300,12 @@ void nes6502_reset(void)
 /* Non-maskable interrupt */
 void nes6502_nmi(void)
 {
-   if (false == cpu.jammed)
+   if (false == cpu->jammed)
    {
       DECLARE_LOCAL_REGS
       GET_GLOBAL_REGS();
       NMI_PROC();
-      cpu.burn_cycles += INT_CYCLES;
+      cpu->burn_cycles += INT_CYCLES;
       STORE_LOCAL_REGS();
    }
 }
@@ -2310,7 +2313,7 @@ void nes6502_nmi(void)
 /* Interrupt request */
 void nes6502_irq(void)
 {
-   if (false == cpu.jammed)
+   if (false == cpu->jammed)
    {
       DECLARE_LOCAL_REGS
 
@@ -2318,11 +2321,11 @@ void nes6502_irq(void)
       if (0 == i_flag)
       {
          IRQ_PROC();
-         cpu.burn_cycles += INT_CYCLES;
+         cpu->burn_cycles += INT_CYCLES;
       }
       else
       {
-         cpu.int_pending = true;
+         cpu->int_pending = true;
       }
       STORE_LOCAL_REGS();
    }
@@ -2331,17 +2334,17 @@ void nes6502_irq(void)
 /* clear any pending IRQ */
 void nes6502_clearirq(void)
 {
-   cpu.int_pending = false;
+   cpu->int_pending = false;
 }
 
 /* Set burn cycle period */
 void nes6502_burn(long cycles)
 {
-   cpu.burn_cycles += cycles;
+   cpu->burn_cycles += cycles;
 }
 
 /* Release our timeslice */
 void nes6502_release(void)
 {
-   cpu.remaining_cycles = 0;
+   cpu->remaining_cycles = 0;
 }

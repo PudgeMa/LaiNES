@@ -12,4 +12,4 @@ env = Environment(ENV       = environ,
                   CPPPATH   = ['#simpleini', '#lib/include', '#src/include'],
                   LIBS      = ['SDL2', 'SDL2_image', 'SDL2_ttf'])
 
-env.Program('laines', Glob('build/*/*.cpp') + Glob('build/*/*/*.cpp') + Glob('build/*/*.c'))
+env.Program('laines', Glob('build/*/*.cpp') + Glob('build/*/*/*.cpp') + Glob('build/*/*.c') + Glob('build/*/*/*.c'))

@@ -1,5 +1,6 @@
 #pragma once
 #include "common.hpp"
+#include "cartridge_new.h"
 
 namespace PPU {
 
@@ -84,7 +85,7 @@ union Addr
 
 template <bool write> u8 access(u16 index, u8 v = 0);
 void set_mirroring(Mirroring mode);
-void reset();
+void init(struct cartridge_mmc *mmc);
 void scanline_visible(int line, u32* buffer);
 void scanline_other(int line);
 

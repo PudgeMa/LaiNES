@@ -82,7 +82,6 @@ extern void    nes6502_release(void);
 
 /* Context get/set */
 extern void    nes6502_setcontext(nes6502_context *cpu);
-extern void    nes6502_getcontext(nes6502_context *cpu);
 
 #ifdef __cplusplus
 }

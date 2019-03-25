@@ -1,10 +1,11 @@
-#include "cartridge.hpp"
 #include "cpu.hpp"
 #include "gui.hpp"
 #include "ppu.hpp"
 
 namespace PPU {
 #include "palette.inc"
+
+struct cartridge_mmc *MMC;
 
 Mirroring mirroring;       // Mirroring mode.
 u8 ciRam[0x800];           // VRAM for nametables.
@@ -40,7 +41,8 @@ u8 rd(u16 addr)
 {
     switch (addr)
     {
-        case 0x0000 ... 0x1FFF:  return Cartridge::chr_access<0>(addr);  // CHR-ROM/RAM.
+        case 0x0000 ... 0x1FFF:  
+            return MMC->chr_map[addr / CARTRIDGE_CHR_BANK_SIZE][addr % CARTRIDGE_CHR_BANK_SIZE];  // CHR-ROM/RAM.
         case 0x2000 ... 0x3EFF:  return ciRam[nt_mirror(addr)];          // Nametables.
         case 0x3F00 ... 0x3FFF:  // Palettes:
             if ((addr & 0x13) == 0x10) addr &= ~0x10;
@@ -52,7 +54,7 @@ void wr(u16 addr, u8 v)
 {
     switch (addr)
     {
-        case 0x0000 ... 0x1FFF:  Cartridge::chr_access<1>(addr, v); break;  // CHR-ROM/RAM.
+        case 0x0000 ... 0x1FFF:  MMC->mapper.chr_write(addr, v); break;  // CHR-ROM/RAM.
         case 0x2000 ... 0x3EFF:  ciRam[nt_mirror(addr)] = v; break;         // Nametables.
         case 0x3F00 ... 0x3FFF:  // Palettes:
             if ((addr & 0x13) == 0x10) addr &= ~0x10;
@@ -368,8 +370,9 @@ void scanline_other(int line)
 	}
 }
 
-void reset()
+void init(struct cartridge_mmc *mmc)
 {
+    MMC = mmc;
     ctrl.r = mask.r = status.r = 0;
     memset(ciRam,  0xFF, sizeof(ciRam));
     memset(oamMem, 0x00, sizeof(oamMem));

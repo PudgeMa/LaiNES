@@ -1,8 +1,6 @@
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
-#include "apu.hpp"
-#include "cartridge.hpp"
+#include "cartridge_new.h"
 #include "ppu.hpp"
 #include "cpu.hpp"
 #include "nes6502.h"
@@ -11,6 +9,16 @@
 #include "gui.hpp"
 
 namespace CPU {
+
+const int writehandlers_num = 4;
+
+#define NES_SCANLINE_CYCLES 113
+
+u8 mem[0x800];
+long current_cycles = 0;
+
+nes6502_context context;
+struct cartridge_mmc mmc;
 
 int dmc_read(void*, cpu_addr_t addr) 
 {
@@ -57,6 +65,10 @@ void dma_write(void *userdata, uint16_t offset, uint8_t value) {
     }
 }
 
+void mapper_prg_write(void *userdata, uint16_t offset, uint8_t value) {
+    mmc.mapper.prg_write(offset, value);
+}
+
 nes6502_memread readhandlers[] = {
     {
         .min_range = 0x2000,
@@ -89,36 +101,35 @@ nes6502_memwrite writehandlers[] = {
         .max_range = 0x4016,
         .write_func = joypad_handler_write,
         .userdata = nullptr
+    }, {
+        .min_range = 0x8000,
+        .max_range = 0xFFFF,
+        .write_func = mapper_prg_write,
+        .userdata = nullptr
     }
 };
 
-const int writehandlers_num = 3;
-
-#define NES_SCANLINE_CYCLES 113
-
-u8 mem[0x800];
-long current_cycles = 0;
-
-void power()
+void power(struct cartridge_info *info)
 {
+
     memset(mem, 0, sizeof(mem));
 
-    nes6502_context context;
-    memset(&context, 0, sizeof(nes6502_context));
     context.mem_page[0] = mem;
 
-    Mapper::mempage* pages;
-    int num = Cartridge::get_memory(&pages);
-    for(size_t i = 0; i < num; i++)
-    {
-        context.mem_page[pages[i].pagenum] = pages[i].mem;
-    }
 
     context.jam_callback = cpu_jam;
     context.read_handler= readhandlers;
     context.read_num = readhandlers_num;
     context.write_handler = writehandlers;
     context.write_num = writehandlers_num;
+
+    mmc.prg_ram = &context.mem_page[3];
+    mmc.prg_map = &context.mem_page[4];
+
+    cartridge_init(&mmc);
+
+    PPU::init(&mmc);
+    PPU::set_mirroring(info->mirroring ? PPU::VERTICAL : PPU::HORIZONTAL);
 
     nes6502_setcontext(&context);
     nes6502_reset();

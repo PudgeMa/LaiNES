@@ -1,9 +1,6 @@
 #include <csignal>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
-#include "Sound_Queue.h"
-#include "apu.hpp"
-#include "cartridge.hpp"
 #include "cpu.hpp"
 #include "menu.hpp"
 #include "gui.hpp"
@@ -19,7 +16,6 @@ SDL_Texture* gameTexture;
 SDL_Texture* background;
 TTF_Font* font;
 u8 const* keys;
-Sound_Queue* soundQueue;
 SDL_Joystick* joystick[] = { nullptr, nullptr };
 
 // Menus:
@@ -51,10 +47,6 @@ void init()
 
     for (int i = 0; i < SDL_NumJoysticks(); i++)
         joystick[i] = SDL_JoystickOpen(i);
-
-    APU::init();
-    soundQueue = new Sound_Queue;
-    soundQueue->init(96000);
 
     // Initialize graphics structures:
     window      = SDL_CreateWindow  ("LaiNES",
@@ -206,7 +198,6 @@ void new_frame(u32* pixels)
 
 void new_samples(const blip_sample_t* samples, size_t count)
 {
-    soundQueue->write(samples, count);
 }
 
 /* Render the screen */
@@ -214,14 +205,7 @@ void render()
 {
     SDL_RenderClear(renderer);
 
-    // Draw the NES screen:
-    if (Cartridge::loaded())
-        SDL_RenderCopy(renderer, gameTexture, NULL, NULL);
-    else
-        SDL_RenderCopy(renderer, background, NULL, NULL);
-
-    // Draw the menu:
-    if (pause) menu->render();
+    SDL_RenderCopy(renderer, gameTexture, NULL, NULL);
 
     SDL_RenderPresent(renderer);
 }
@@ -269,6 +253,8 @@ int query_button()
     }
 }
 
+struct cartridge_info info;
+
 /* Run the emulator */
 void run()
 {
@@ -278,9 +264,9 @@ void run()
     u32 frameStart, frameTime;
     const int FPS   = 60;
     const int DELAY = 1000.0f / FPS;
-
-    // Cartridge::load("/home/maruipu/code/nes/SolomKey.nes");
-    // toggle_pause();
+	cartridge_open("/home/maruipu/code/nes/Arkanoid.nes", &info);
+    CPU::power(&info);
+    
     while (true)
     {
         frameStart = SDL_GetTicks();
@@ -290,16 +276,9 @@ void run()
             switch (e.type)
             {
                 case SDL_QUIT: return;
-                case SDL_KEYDOWN:
-                    if (keys[SDL_SCANCODE_ESCAPE] and Cartridge::loaded())
-                        toggle_pause();
-                    else if (pause)
-                        menu->update(keys);       
             }
 
-        if (not pause) {
-            CPU::run_frame();
-        } 
+        CPU::run_frame();
     
         render();
 
