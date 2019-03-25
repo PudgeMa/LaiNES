@@ -222,11 +222,16 @@ static inline void cacheOAM(int line)
 
 void draw_bgtile(u8* buffer, u8 bgL, u8 bgH, u8 at)
 {
-    for (int i = 0; i < 8; ++i) {
-        buffer[i] = at + (((bgH >> 6) & 0b10) | (bgL >> 7));
-        bgH <<= 1;
-        bgL <<= 1;
-    }
+    u32 pattern = ((bgH & 0xaa) << 8) | ((bgH & 0x55) << 1)
+                    | ((bgL & 0xaa) << 7) | (bgL & 0x55);
+    buffer[0] = at + ((pattern >> 14) & 3);
+    buffer[1] = at + ((pattern >> 6) & 3);
+    buffer[2] = at + ((pattern >> 12) & 3);
+    buffer[3] = at + ((pattern >> 4) & 3);
+    buffer[4] = at + ((pattern >> 10) & 3);
+    buffer[5] = at + ((pattern >> 2) & 3);
+    buffer[6] = at + ((pattern >> 8) & 3);
+    buffer[7] = at + (pattern & 3);
 }
 
 void renderBGLine(u8* row)
