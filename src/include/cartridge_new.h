@@ -55,11 +55,11 @@ struct cartridge_mmc
 {
     uint8_t* *prg_map;
     uint8_t* *prg_ram;
-    uint8_t* chr_map[CARTRIDGE_CHR_BANK_NUM];
+    uint8_t chr_mem[CARTRIDGE_CHR_MEM_SIZE];
     struct cartridge_mapper mapper;
 };
 
-bool cartridge_open(const char *file, struct cartridge_info* info);
+bool cartridge_open(const char *file, struct cartridge_info *info);
 bool cartridge_init(struct cartridge_mmc *mmc);
 void cartridge_mapPRG(enum cartridge_prg_page size, int targetSlot, int pageNum);
 void cartridge_mapCHR(enum cartridge_chr_page size, int targetSlot, int pageNum);

@@ -2,11 +2,12 @@ from os import environ
 
 VariantDir('build/src', 'src', duplicate=0)
 VariantDir('build/lib', 'lib', duplicate=0)
-flags = ['-O3', '-march=native', '-std=c++11']
+flags = [ '-g', '-march=native', '-std=c++11']
 
 env = Environment(ENV       = environ,
                   CXX       = 'g++',
                   CPPFLAGS  = ['-Wno-unused-value'],
+                  CFLAGS    = ['-g'],
                   CXXFLAGS  = flags,
                   LINKFLAGS = flags,
                   CPPPATH   = ['#simpleini', '#lib/include', '#src/include'],

@@ -7,13 +7,12 @@
 
 uint8_t prg_rom[CARTRIDGE_PRG_ROM_SIZE];
 uint8_t prg_ram[CARTRIDGE_PRG_RAM_SIZE];
-uint8_t chr_mem[CARTRIDGE_CHR_MEM_SIZE];
 
 FILE* game_file;
 struct cartridge_info *game_info;
 struct cartridge_mmc *game_mmc;
 
-bool cartridge_open(const char* path, struct cartridge_info* info)
+bool cartridge_open(const char *path, struct cartridge_info *info)
 {
     uint8_t header_buffer[16];
     game_file = fopen(path, "rb");
@@ -31,7 +30,7 @@ bool cartridge_open(const char* path, struct cartridge_info* info)
     }
     printf("cartridge, mapper(%d), mirroring(%d), prg_size(%d), prg_pos(%d) ",
             info->mapper_num, info->mirroring, info->prg_rom_size, info->prg_rom_pos);
-    printf("chr_ram(%d), chr_size(%d), chr(%d)\n",
+    printf("chr_ram(%d), chr_size(%d), chr_pos(%d)\n",
             info->chr_mem_ram, info->chr_mem_size, info->chr_rom_pos);
     game_info = info;
     return true;
@@ -57,11 +56,6 @@ bool cartridge_init(struct cartridge_mmc *mmc)
         return false;
     }
     mmc->prg_ram[0] = prg_ram;
-    if (game_info->chr_mem_ram) {
-        for(size_t i = 0; i < CARTRIDGE_CHR_BANK_NUM; ++i) {
-            mmc->chr_map[i] = &chr_mem[i * CARTRIDGE_CHR_BANK_SIZE];    
-        }
-    }
 
     // fseek(game_file, game_info->prg_rom_pos, SEEK_SET);
     // int size = fread(prg_rom, game_info->prg_rom_size, 1, game_file);
@@ -94,16 +88,14 @@ void cartridge_mapPRG(enum cartridge_prg_page size, int targetSlot, int pageNum)
 void cartridge_mapCHR(enum cartridge_chr_page size, int targetSlot, int pageNum)
 {
     printf("cartridge_mapCHR(%d, %d, %d)\n", size, targetSlot, pageNum);
-    int bankOfSlot = size;
-    int pageSize = size * 1024;
-    
+    int pageSize = size * 1024;    
     int memPos = pageSize * targetSlot;
-    fseek(game_file, game_info->chr_rom_pos + pageNum * pageSize, SEEK_SET);
-    int readSize = game_info->chr_mem_size > pageSize ? pageSize : game_info->chr_mem_size;
-    fread(chr_mem + memPos, readSize, 1, game_file);
+    int filePos = pageSize * pageNum;
 
-    for (int i = 0; i < bankOfSlot; ++i) {
-        game_mmc->chr_map[bankOfSlot * targetSlot + i]
-            = chr_mem + ((pageSize * pageNum + 0x400 * i) % game_info->chr_mem_size);
+    if (game_info->chr_mem_size < filePos + pageSize) {
+        printf("error!, can't read %d bytes at %d\n", filePos, pageSize);
     }
+
+    fseek(game_file, game_info->chr_rom_pos + filePos, SEEK_SET);
+    fread(game_mmc->chr_mem + memPos, pageSize, 1, game_file);
 }

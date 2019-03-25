@@ -264,7 +264,7 @@ void run()
     u32 frameStart, frameTime;
     const int FPS   = 60;
     const int DELAY = 1000.0f / FPS;
-	cartridge_open("/home/maruipu/code/nes/Arkanoid.nes", &info);
+	cartridge_open("/home/maruipu/code/nes/SolomKey.nes", &info);
     CPU::power(&info);
     
     while (true)

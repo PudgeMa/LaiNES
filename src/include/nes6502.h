@@ -44,7 +44,7 @@ typedef struct nes6502_context_s
     * 0x6000 - 0x8000 SRAM
     * 0x8000 - 0xffff PRG-ROM
     */
-   uint8_t  *mem_page[NES6502_NUMBANKS];
+   uint8_t* mem_page[NES6502_NUMBANKS];
 
     /* user callback, for when cpu hits a JAM instruction */
    void     (*jam_callback)(struct nes6502_context_s *context);

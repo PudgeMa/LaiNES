@@ -42,7 +42,7 @@ u8 rd(u16 addr)
     switch (addr)
     {
         case 0x0000 ... 0x1FFF:  
-            return MMC->chr_map[addr / CARTRIDGE_CHR_BANK_SIZE][addr % CARTRIDGE_CHR_BANK_SIZE];  // CHR-ROM/RAM.
+            return MMC->chr_mem[addr];  // CHR-ROM/RAM.
         case 0x2000 ... 0x3EFF:  return ciRam[nt_mirror(addr)];          // Nametables.
         case 0x3F00 ... 0x3FFF:  // Palettes:
             if ((addr & 0x13) == 0x10) addr &= ~0x10;
