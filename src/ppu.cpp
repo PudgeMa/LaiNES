@@ -238,13 +238,18 @@ void draw_bgtile(u8* buffer, u8 bgL, u8 bgH, u8 at)
 
 void renderBGLine(u8* row)
 {
+    u16 addr;
+    u8 nt, at, bgL, bgH;
     row += (8 - fX);
-    int tile_count = 32;
-    while(tile_count-- > 0) {
-        u16 addr = nt_addr();
-        u8 nt = rd(addr);
+    int tile_num = 0;
+    while(tile_num++ < 33) {
+        if (!mask.bg || (!mask.bgLeft && tile_num == 0)) {
+            goto end;
+        }
+        addr = nt_addr();
+        nt = rd(addr);
         addr = at_addr();
-        u8 at = rd(addr);  
+        at = rd(addr);  
         if (vAddr.cY & 2) {
             at >>= 4;
         } 
@@ -252,9 +257,10 @@ void renderBGLine(u8* row)
             at >>= 2; 
         }
         addr = bg_addr(nt);
-        u8 bgL = rd(addr);
-        u8 bgH = rd(addr + 8);
+        bgL = rd(addr);
+        bgH = rd(addr + 8);
         draw_bgtile(row, bgL, bgH, (at & 3) << 2);
+    end:    
         if (rendering()) {
             h_scroll();
         }
@@ -264,6 +270,9 @@ void renderBGLine(u8* row)
 
 void renderOAMLine(u8* row)
 {
+    if (!mask.spr) {
+        return;
+    }
     for(int i = 7; i >= 0; i--)
     {
         if (oam[i].id == 64) {
@@ -298,6 +307,9 @@ void renderOAMLine(u8* row)
         bool objPriority = oam[i].attr & 0x20;
         for(int j = 0; j < 8; ++j)
         {
+            if (!mask.sprLeft && (x + j) < 8) {
+                continue;
+            }
             if (pixels[j] != 0 && (row[x + j] == 0 || objPriority == 0))
             {
                 row[x + j] = at + pixels[j];
