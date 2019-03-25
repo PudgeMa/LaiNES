@@ -138,14 +138,14 @@ void run_frame()
 {
     for (int i = 0; i < 240; ++i)
     {
-		PPU::scanline_visible(i, pixels + i * 256);
-	    execute();
+        execute();
+		PPU::scanline_visible(i, pixels + (i * 256));
     }
     GUI::new_frame(pixels);
     for(int i = 240; i <= 261; ++i)
     {
+        execute();
 		PPU::scanline_other(i);
-		execute();
     }
 }
 

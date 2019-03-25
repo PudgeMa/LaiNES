@@ -279,10 +279,8 @@ void run()
     const int FPS   = 60;
     const int DELAY = 1000.0f / FPS;
 
-    const int nesNum = 100;
-    u32 nesStart; u32 nesEnd;
-    int nesI = 0, nesAll = 0;
-
+    // Cartridge::load("/home/maruipu/code/nes/SolomKey.nes");
+    // toggle_pause();
     while (true)
     {
         frameStart = SDL_GetTicks();
