@@ -6,7 +6,6 @@
 namespace PPU {
 #include "palette.inc"
 
-
 Mirroring mirroring;       // Mirroring mode.
 u8 ciRam[0x800];           // VRAM for nametables.
 u8 cgRam[0x20];            // VRAM for palettes.
@@ -212,7 +211,7 @@ void load_sprites(int line)
     }
 }
 
-u8 rowdata[8+ 256 + 8];
+u8 rowdata[8 + 256 + 8];
 
 static inline void cacheOAM(int line)
 {
@@ -223,29 +222,25 @@ static inline void cacheOAM(int line)
 
 void draw_bgtile(u8* buffer, u8 bgL, u8 bgH, u8 at)
 {
-   u32 pattern = ((bgH & 0xaa) << 8) | ((bgH & 0x55) << 1)
-                    | ((bgL & 0xaa) << 7) | (bgL & 0x55);
-
-   *buffer++ = at + ((pattern >> 14) & 3);
-   *buffer++ = at + ((pattern >> 6) & 3);
-   *buffer++ = at + ((pattern >> 12) & 3);
-   *buffer++ = at + ((pattern >> 4) & 3);
-   *buffer++ = at + ((pattern >> 10) & 3);
-   *buffer++ = at + ((pattern >> 2) & 3);
-   *buffer++ = at + ((pattern >> 8) & 3);
-   *buffer = at + (pattern & 3);
+    for (int i = 0; i < 8; ++i) {
+        buffer[i] = at + (((bgH >> 6) & 0b10) | (bgL >> 7));
+        bgH <<= 1;
+        bgL <<= 1;
+    }
 }
 
 void renderBGLine(u8* row)
 {
     u16 addr;
     u8 nt, at, bgL, bgH;
-    row += (8 - fX);
+    u8 *buffer = row;
+    if (!mask.bg) {
+        memset(buffer + 8, 0, 256);
+        return;
+    }
+    buffer += (8 - fX);
     int tile_num = 0;
-    while(tile_num++ < 33) {
-        if (!mask.bg || (!mask.bgLeft && tile_num == 0)) {
-            goto end;
-        }
+    while(tile_num < 33) {
         addr = nt_addr();
         nt = rd(addr);
         addr = at_addr();
@@ -259,12 +254,15 @@ void renderBGLine(u8* row)
         addr = bg_addr(nt);
         bgL = rd(addr);
         bgH = rd(addr + 8);
-        draw_bgtile(row, bgL, bgH, (at & 3) << 2);
-    end:    
-        if (rendering()) {
-            h_scroll();
-        }
-        row += 8;
+        draw_bgtile(buffer, bgL, bgH, (at & 3) << 2);
+        h_scroll();
+        buffer += 8;
+        tile_num += 1;
+    }
+    if (!mask.bgLeft) {
+        u32 *bf = (u32*)(row + 8);
+        bf[0] = 0;
+        bf[1] = 0;
     }
 }
 
@@ -325,24 +323,17 @@ void renderScanline(u32* buffer)
     renderOAMLine(rowdata + 8);
     for(int i = 0; i < 256; i++)
     {
-    	buffer[i] = nesRgb[cgRam[rowdata[i + 8]]];
+    	buffer[i] = nesRgb[rd(0x3F00 + (rendering() ? rowdata[i + 8] : 0))];
     }
 }
 
 void scanline_visible(int line, u32* buffer)
 {
-	if (rendering())
-	{
-		h_update();
-		if (0 == line)
-		{
-			v_update();
-		}
-	}
 	renderScanline(buffer);
 	if (rendering())
 	{
 		v_scroll();
+        h_update();
 	}
     cacheOAM(line);
 }
@@ -352,22 +343,29 @@ void scanline_other(int line)
 	if (line == 241)
 	{
 		status.vBlank = true;
-	    if (ctrl.nmi)
+	}
+    // avoid race condition:
+    // http://wiki.nesdev.com/w/index.php/NMI#Race_condition
+    else if (line == 242)
+    {   
+        if (ctrl.nmi)
 	    {
 	    	CPU::set_nmi();
 	    }
-	}
+    }
 	else if (line == 261)
 	{
 		status.vBlank = false;
         cacheOAM(line);
+        if (rendering()) {
+		    v_update();
+	    }
 	}
 }
 
 void reset()
 {
     ctrl.r = mask.r = status.r = 0;
-
     memset(ciRam,  0xFF, sizeof(ciRam));
     memset(oamMem, 0x00, sizeof(oamMem));
 }
