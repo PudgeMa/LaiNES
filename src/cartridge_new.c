@@ -1,6 +1,7 @@
 #include "cartridge_new.h"
 #include "iNES.h"
 #include "mappers/mapper_0.h"
+#include "mappers/mapper_2.h"
 #include "mappers/mapper_3.h"
 #include "mappers/mapper_default.h"
 #include <stdio.h>
@@ -48,6 +49,10 @@ bool cartridge_init(struct cartridge_mmc *mmc)
     case 0:
         mapper->init = mapper_0_init;
         break;
+    case 2:
+        mapper->init = mapper_2_init;
+        mapper->prg_write = mapper_2_prg_write;
+        break;
     case 3:
         mapper->init = mapper_3_init;
         mapper->prg_write = mapper_3_prg_write;
@@ -75,7 +80,9 @@ void cartridge_bankPRG(enum cartridge_window size, int target, int window)
     }
 
     fseek(game_file, game_info->prg_rom_pos + filePos, SEEK_SET);
-    fread(prg_rom + memPos, windowSize, 1, game_file);
+    if (1 != fread(prg_rom + memPos, windowSize, 1, game_file)) {
+        printf("error!, read fail\n");
+    }
 }
 
 void cartridge_mirrorPRG(enum cartridge_prg_mirror mode)

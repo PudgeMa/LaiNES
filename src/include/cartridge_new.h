@@ -28,9 +28,9 @@ enum cartridge_window {
 };
 
 enum cartridge_prg_mirror {
-    CARTRIDGE_MIRROR_8 = 8,
-    CARTRIDGE_MIRROR_16 = 16,
-    CARTRIDGE_MIRROR_32 = 32
+    CARTRIDGE_MIRROR_4 = 8,
+    CARTRIDGE_MIRROR_2 = 16,
+    CARTRIDGE_MIRROR_1 = 32
 };
 
 struct cartridge_info

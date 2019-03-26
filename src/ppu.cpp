@@ -54,7 +54,7 @@ void wr(u16 addr, u8 v)
 {
     switch (addr)
     {
-        case 0x0000 ... 0x1FFF:  MMC->mapper.chr_write(addr, v); break;  // CHR-ROM/RAM.
+        case 0x0000 ... 0x1FFF:  MMC->chr_mem[addr] =  v; break;  // CHR-ROM/RAM.
         case 0x2000 ... 0x3EFF:  ciRam[nt_mirror(addr)] = v; break;         // Nametables.
         case 0x3F00 ... 0x3FFF:  // Palettes:
             if ((addr & 0x13) == 0x10) addr &= ~0x10;
