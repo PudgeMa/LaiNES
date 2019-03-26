@@ -2,10 +2,16 @@
 
 int reg;
 
-void mapper_3_init()
+void mapper_3_init(struct cartridge_info *info)
 {
-    cartridge_mapPRG(CARTRIDGE_PRG_PAGE_32, 0, 0);
-    cartridge_mapCHR(CARTRIDGE_CHR_PAGE_8, 0, 0);
+    if (info->prg_rom_size == (32 * 1024)) {
+        cartridge_mirrorPRG(CARTRIDGE_MIRROR_32);
+        cartridge_bankPRG(CARTRIDGE_WINDOW_PRG_32, 0, 0);
+    } else {
+        cartridge_mirrorPRG(CARTRIDGE_MIRROR_16);
+        cartridge_bankPRG(CARTRIDGE_WINDOW_PRG_16, 0, 0);
+    }
+    cartridge_bankCHR(CARTRIDGE_WINDOW_CHR_8, 0, 0);
     reg = 0;
 }
 
@@ -13,7 +19,7 @@ void mapper_3_prg_write(int addr, uint8_t value)
 {
     int target = value & 0b11;
     if (target != reg) {
-        cartridge_mapCHR(CARTRIDGE_CHR_PAGE_8, 0, target);
+        cartridge_bankCHR(CARTRIDGE_WINDOW_CHR_8, 0, target);
         reg = target;
     }
 }

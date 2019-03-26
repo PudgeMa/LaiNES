@@ -7,7 +7,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-void mapper_3_init();
+void mapper_3_init(struct cartridge_info *info);
 void mapper_3_prg_write(int addr, uint8_t value);
 
 #ifdef __cplusplus
