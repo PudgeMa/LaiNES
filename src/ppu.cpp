@@ -236,11 +236,11 @@ void draw_bgtile(u8* buffer, u8 bgL, u8 bgH, u8 at)
     buffer[7] = at + (pattern & 3);
 }
 
-void renderBGLine(u8* row)
+void renderBgLine()
 {
     u16 addr;
     u8 nt, at, bgL, bgH;
-    u8 *buffer = row;
+    u8 *buffer = rowdata;
     if (!mask.bg) {
         memset(buffer + 8, 0, 256);
         return;
@@ -267,67 +267,98 @@ void renderBGLine(u8* row)
         tile_num += 1;
     }
     if (!mask.bgLeft) {
-        u32 *bf = (u32*)(row + 8);
+        u32 *bf = (u32*)(rowdata + 8);
         bf[0] = 0;
         bf[1] = 0;
     }
 }
 
-void renderOAMLine(u8* row)
+bool calcSpriteTile(u8 *pixels,  Sprite *sp)
 {
+    u8 pat1 = sp->dataH;
+    u8 pat0 = sp->dataL;
+    if ((pat0 | pat1) == 0) {
+        return false;
+    }
+    u32 pattern = ((pat1 & 0xaa) << 8) | ((pat1 & 0x55) << 1)
+            | ((pat0 & 0xaa) << 7) | (pat0 & 0x55);
+    if ((sp->attr & 0x40) == 0) {
+        pixels[0] = (pattern >> 14) & 3;
+        pixels[1] = (pattern >> 6) & 3;
+        pixels[2] = (pattern >> 12) & 3;
+        pixels[3] = (pattern >> 4) & 3;
+        pixels[4] = (pattern >> 10) & 3;
+        pixels[5] = (pattern >> 2) & 3;
+        pixels[6] = (pattern >> 8) & 3;
+        pixels[7] = pattern & 3;
+    } else {
+        pixels[7] = (pattern >> 14) & 3;
+        pixels[6] = (pattern >> 6) & 3;
+        pixels[5] = (pattern >> 12) & 3;
+        pixels[4] = (pattern >> 4) & 3;
+        pixels[3] = (pattern >> 10) & 3;
+        pixels[2] = (pattern >> 2) & 3;
+        pixels[1] = (pattern >> 8) & 3;
+        pixels[0] = pattern & 3;
+    }
+    return true;
+}
+
+void renderOAMLine()
+{
+    u8 pixels[8];
+    u32 save[2];
+    int hitPos;
+    bool hit = false;
+    u8 *buffer = rowdata + 8;
     if (!mask.spr) {
         return;
     }
-    for(int i = 7; i >= 0; i--)
-    {
-        if (oam[i].id == 64) {
-            continue;  // Void entry.
+    save[0] = ((u32*) (buffer))[0];
+    save[1] = ((u32*) (buffer))[1];
+
+    for(int i = 0; i < 8; ++i) {
+        Sprite *sp = &oam[i];
+        if (sp->id == 64) {
+            break;
         }
-        u8 pat1 = oam[i].dataH;
-        u8 pat0 = oam[i].dataL;
-        u32 pattern = ((pat1 & 0xaa) << 8) | ((pat1 & 0x55) << 1)
-                    | ((pat0 & 0xaa) << 7) | (pat0 & 0x55);
-        u8 pixels[8];
-        if ((oam[i].attr & 0x40) == 0) {
-            pixels[0] = (pattern >> 14) & 3;
-            pixels[1] = (pattern >> 6) & 3;
-            pixels[2] = (pattern >> 12) & 3;
-            pixels[3] = (pattern >> 4) & 3;
-            pixels[4] = (pattern >> 10) & 3;
-            pixels[5] = (pattern >> 2) & 3;
-            pixels[6] = (pattern >> 8) & 3;
-            pixels[7] = pattern & 3;
-        } else {
-            pixels[7] = (pattern >> 14) & 3;
-            pixels[6] = (pattern >> 6) & 3;
-            pixels[5] = (pattern >> 12) & 3;
-            pixels[4] = (pattern >> 4) & 3;
-            pixels[3] = (pattern >> 10) & 3;
-            pixels[2] = (pattern >> 2) & 3;
-            pixels[1] = (pattern >> 8) & 3;
-            pixels[0] = pattern & 3;
+        if (!calcSpriteTile(pixels, sp)) {
+            continue;
         }
-        u8 at = ((oam[i].attr & 3) << 2) + 16;
-        int x = oam[i].x;
-        bool objPriority = oam[i].attr & 0x20;
-        for(int j = 0; j < 8; ++j)
-        {
-            if (!mask.sprLeft && (x + j) < 8) {
+        u8 at = ((sp->attr & 3) << 2) + 16;
+        u8 priority = sp->attr & 0x20;
+        for(int j = 0; j < 8; ++j) {
+            if (pixels[j] == 0) {
                 continue;
             }
-            if (pixels[j] != 0 && (row[x + j] == 0 || objPriority == 0))
-            {
-                row[x + j] = at + pixels[j];
+            int pos = sp->x + j;
+            u8 bg = buffer[pos];
+            if ((bg & 0x80) == 0) {
+                if (bg && sp->id == 0 && pos != 255) {
+                    hit = true;
+                    hitPos = pos;
+                    status.sprHit = true;
+                }                
+                if (bg == 0 || priority == 0) {
+                    buffer[pos] = at + pixels[j];
+                }
+                buffer[pos] |= 0x80;
             }
         }
     }
-    
+    if (!mask.sprLeft) {
+        ((u32*) (buffer))[0] = save[0];
+        ((u32*) (buffer))[1] = save[1];
+        if (hitPos < 8) {
+            status.sprHit = false;
+        }
+    }
 }
 
 void renderScanline(u32* buffer)
 {
-    renderBGLine(rowdata);
-    renderOAMLine(rowdata + 8);
+    renderBgLine();
+    renderOAMLine();
     for(int i = 0; i < 256; i++)
     {
     	buffer[i] = nesRgb[rd(0x3F00 + (rendering() ? rowdata[i + 8] : 0))];
@@ -341,6 +372,7 @@ void scanline_visible(int line, u32* buffer)
 	{
 		v_scroll();
         h_update();
+        MMC->mapper.scanline();
 	}
     cacheOAM(line);
 }
@@ -363,9 +395,12 @@ void scanline_other(int line)
 	else if (line == 261)
 	{
 		status.vBlank = false;
+        status.sprHit = false;
+        status.sprOvf = false;
         cacheOAM(line);
         if (rendering()) {
 		    v_update();
+            MMC->mapper.scanline();
 	    }
 	}
 }
