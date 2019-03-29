@@ -361,7 +361,8 @@ void renderScanline(u32* buffer)
     renderOAMLine();
     for(int i = 0; i < 256; i++)
     {
-    	buffer[i] = nesRgb[rd(0x3F00 + (rendering() ? rowdata[i + 8] : 0))];
+        u8 data = rowdata[i + 8] & 0x7F;
+    	buffer[i] = nesRgb[rd(0x3F00 + (rendering() ? data : 0))];
     }
 }
 
